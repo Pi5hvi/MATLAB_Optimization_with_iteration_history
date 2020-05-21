@@ -1,0 +1,295 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>runfmincon</title><meta name="generator" content="MATLAB 9.2"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2017-10-04"><meta name="DC.source" content="runfmincon.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h2>Contents</h2><div><ul><li><a href="#2">Set up shared variables with OUTFUN</a></li><li><a href="#3">Call optimization</a></li><li><a href="#4">Stop function (THIS IS WHERE ALL THE MAGIC HAPPENS)</a></li><li><a href="#5">Objective function definition</a></li><li><a href="#6">Constraint function definition</a></li></ul></div><pre class="codeinput"><span class="keyword">function</span> [history,searchdir] = runfmincon
+</pre><h2 id="2">Set up shared variables with OUTFUN</h2><pre class="codeinput">history.x = [];<span class="comment">%variable to record current x</span>
+history.fval = [];
+searchdir = [];
+history.y = [0 0];<span class="comment">%variable that recalls previous x (used for quiver)</span>
+</pre><h2 id="3">Call optimization</h2><pre class="codeinput"><span class="comment">% Setting up variables for fmincon</span>
+fun = @myfun;
+a = [.1 .1]; <span class="comment">% infeasible initial guess</span>
+A = [];
+b = [];
+Aeq = [];
+beq = [];
+lb = [];
+ub = [];
+nonlcon = @constraint;
+options = optimoptions(@fmincon,<span class="string">'OutputFcn'</span>,@outfun,<span class="keyword">...</span>
+    <span class="string">'SpecifyObjectiveGradient'</span>,true,<span class="string">'SpecifyConstraintGradient'</span>,true',<span class="string">'Display'</span>,<span class="string">'iter'</span>,<span class="string">'Algorithm'</span>,<span class="string">'active-set'</span>);
+xsol = fmincon(fun , a , A , b , Aeq , beq , lb , ub , nonlcon, options)
+</pre><pre class="codeoutput">
+                                Max     Line search  Directional  First-order 
+ Iter F-count        f(x)   constraint   steplength   derivative   optimality Procedure 
+    0      1         0.02         0.89                                         Infeasible start point
+    1      3     0.987019   -0.0002996            1        0.204        0.887   
+    2      5     0.983714     -0.04146            1       -0.225         0.56   
+    3      7     0.946764    -0.004236            1       -0.633         1.37  Hessian modified  
+    4     10     0.906167     -0.05289          0.5       -0.414         0.84   
+    5     12     0.790108     -0.02941            1       -0.696        0.599   
+    6     14     0.752322    -0.002134            1       -0.475       0.0553   
+    7     16     0.750071   -7.132e-05            1       -0.154     0.000573   
+    8     18         0.75   -4.495e-08            1       -0.229     1.16e-07  Hessian modified  
+
+Local minimum found that satisfies the constraints.
+
+Optimization completed because the objective function is non-decreasing in 
+feasible directions, to within the default value of the optimality tolerance,
+and constraints are satisfied to within the default value of the constraint tolerance.
+
+
+
+Active inequalities (to within options.ConstraintTolerance = 1e-06):
+  lower      upper     ineqlin   ineqnonlin
+                                     1
+
+xsol =
+
+    0.7071    0.5000
+
+</pre><img vspace="5" hspace="5" src="runfmincon_01.png" alt=""> <h2 id="4">Stop function (THIS IS WHERE ALL THE MAGIC HAPPENS)</h2><pre class="codeinput"> <span class="keyword">function</span> stop = outfun(x,optimValues,state)
+     stop = false;
+
+     <span class="keyword">switch</span> state
+
+         <span class="keyword">case</span> <span class="string">'init'</span>
+             <span class="comment">% Setting up the graph during initialization</span>
+             figure(<span class="string">'rend'</span>,<span class="string">'painters'</span>,<span class="string">'pos'</span>,[10 10 1920 1080])
+             hold <span class="string">'on'</span>
+
+         <span class="keyword">case</span> <span class="string">'iter'</span>
+         <span class="comment">% Concatenate current point and objective function</span>
+         <span class="comment">% value with history. x must be a row vector.</span>
+           history.fval = [history.fval; optimValues.fval];
+           history.x = [history.x; x];
+         <span class="comment">% Concatenate current search direction with</span>
+         <span class="comment">% searchdir.</span>
+           searchdir = [searchdir;<span class="keyword">...</span>
+                        optimValues.searchdirection'];
+           plot(x(1),x(2),<span class="string">'o'</span>);
+           <span class="comment">% Drawing quivers starting 2nd iteration</span>
+           <span class="keyword">if</span> x ~= a
+               dp = x - history.y;
+               quiver(history.y(1),history.y(2),dp(1),dp(2),0);
+           <span class="keyword">end</span>
+           <span class="comment">%setting up history.y with current x for next itteration</span>
+           history.y = x;
+         <span class="comment">% Label points with iteration number and add title.</span>
+         <span class="comment">% Add .05 to x(2) to separate label from plotted 'o'</span>
+         <span class="comment">% The if statement is only used to cleanup the last 2 labels</span>
+         <span class="keyword">if</span> size(history.x)&lt;9
+           text(x(1),x(2)+0.01,<span class="keyword">...</span>
+                num2str(optimValues.iteration));
+           title(<span class="string">'Sequence of Points Computed by fmincon'</span>);
+         <span class="keyword">else</span>
+           text(x(1)+0.005,x(2),<span class="keyword">...</span>
+                num2str(optimValues.iteration));
+           title(<span class="string">'Sequence of Points Computed by fmincon'</span>);
+         <span class="keyword">end</span>
+         <span class="comment">%Doing the contour plot for objective function</span>
+           x=[0:.1:1];
+           y=[0:.1:1];
+           [X,Y] = meshgrid(x,y);
+           Z=X.^2+Y.^2;
+           contour(X,Y,Z,<span class="string">'ShowText'</span>,<span class="string">'on'</span>)
+           xlabel(<span class="string">'X(1)'</span>)
+           ylabel(<span class="string">'X(2)'</span>)
+         <span class="comment">%Doing the plot for the constraint function</span>
+         z=1-x.^2;
+         plot(x,z,<span class="string">':'</span>,<span class="string">'Color'</span>,[0,0,0])
+         legend(<span class="string">'Iterative results'</span>,<span class="string">'Objective Function'</span>,<span class="string">'Constraint Function'</span>);
+         text(0.8,0.7,<span class="string">'FEASIBLE REGION'</span>)
+         text(0.5,0.5,<span class="string">'INFEASIBLE REGION'</span>)
+         <span class="keyword">otherwise</span>
+     <span class="keyword">end</span>
+ <span class="keyword">end</span>
+</pre><h2 id="5">Objective function definition</h2><pre class="codeinput"> <span class="keyword">function</span> [f,gradf] = myfun(x)
+    f = x(1)^2 + x(2)^2;
+    gradf = [2.*x(1); 2.*x(2)];
+ <span class="keyword">end</span>
+</pre><h2 id="6">Constraint function definition</h2><pre class="codeinput"> <span class="keyword">function</span> [g,geq,gradg,gradgeq] = constraint(x)
+    g = 1 - x(1)^2 - x(2);
+    geq = [];
+    gradg = [-2.*x(1); -1];
+    gradgeq = [];
+ <span class="keyword">end</span>
+</pre><pre class="codeinput"><span class="keyword">end</span>
+</pre><pre class="codeoutput">
+ans = 
+
+  struct with fields:
+
+       x: [9&times;2 double]
+    fval: [9&times;1 double]
+       y: [0.7071 0.5000]
+
+</pre><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2017a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+function [history,searchdir] = runfmincon
+%% Set up shared variables with OUTFUN
+
+history.x = [];%variable to record current x
+history.fval = [];
+searchdir = [];
+history.y = [0 0];%variable that recalls previous x (used for quiver)
+ 
+%% Call optimization
+
+% Setting up variables for fmincon
+fun = @myfun;
+a = [.1 .1]; % infeasible initial guess
+A = [];
+b = [];
+Aeq = [];
+beq = [];
+lb = [];
+ub = [];
+nonlcon = @constraint;
+options = optimoptions(@fmincon,'OutputFcn',@outfun,... 
+    'SpecifyObjectiveGradient',true,'SpecifyConstraintGradient',true','Display','iter','Algorithm','active-set');
+xsol = fmincon(fun , a , A , b , Aeq , beq , lb , ub , nonlcon, options)
+ 
+%% Stop function (THIS IS WHERE ALL THE MAGIC HAPPENS)
+
+ function stop = outfun(x,optimValues,state)
+     stop = false;
+ 
+     switch state
+         
+         case 'init'
+             % Setting up the graph during initialization
+             figure('rend','painters','pos',[10 10 1920 1080])
+             hold 'on'
+         
+         case 'iter'
+         % Concatenate current point and objective function
+         % value with history. x must be a row vector.
+           history.fval = [history.fval; optimValues.fval];
+           history.x = [history.x; x];
+         % Concatenate current search direction with 
+         % searchdir.
+           searchdir = [searchdir;... 
+                        optimValues.searchdirection'];
+           plot(x(1),x(2),'o');
+           % Drawing quivers starting 2nd iteration
+           if x ~= a
+               dp = x - history.y;
+               quiver(history.y(1),history.y(2),dp(1),dp(2),0);
+           end
+           %setting up history.y with current x for next itteration
+           history.y = x;
+         % Label points with iteration number and add title.
+         % Add .05 to x(2) to separate label from plotted 'o'
+         % The if statement is only used to cleanup the last 2 labels
+         if size(history.x)<9
+           text(x(1),x(2)+0.01,... 
+                num2str(optimValues.iteration));
+           title('Sequence of Points Computed by fmincon');
+         else
+           text(x(1)+0.005,x(2),... 
+                num2str(optimValues.iteration));
+           title('Sequence of Points Computed by fmincon');
+         end
+         %Doing the contour plot for objective function
+           x=[0:.1:1];
+           y=[0:.1:1];
+           [X,Y] = meshgrid(x,y);
+           Z=X.^2+Y.^2;
+           contour(X,Y,Z,'ShowText','on')
+           xlabel('X(1)')
+           ylabel('X(2)')
+         %Doing the plot for the constraint function
+         z=1-x.^2;
+         plot(x,z,':','Color',[0,0,0])
+         legend('Iterative results','Objective Function','Constraint Function');
+         text(0.8,0.7,'FEASIBLE REGION')
+         text(0.5,0.5,'INFEASIBLE REGION')
+         otherwise
+     end
+ end
+ 
+%% Objective function definition
+
+ function [f,gradf] = myfun(x)
+    f = x(1)^2 + x(2)^2;
+    gradf = [2.*x(1); 2.*x(2)];
+ end
+
+%% Constraint function definition
+
+ function [g,geq,gradg,gradgeq] = constraint(x)
+    g = 1 - x(1)^2 - x(2);
+    geq = [];
+    gradg = [-2.*x(1); -1];
+    gradgeq = [];
+ end
+end
+
+##### SOURCE END #####
+--></body></html>
